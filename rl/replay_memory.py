@@ -52,5 +52,5 @@ class ReplayMemoryDataset(Dataset):
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
-        sample = [torch.tensor(v[idx]) for v in self._data.values()]
+        sample = [v[idx] for v in self._data.values()]
         return sample

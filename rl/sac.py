@@ -2,8 +2,8 @@ import os
 import torch
 import torch.nn.functional as F
 from torch.optim import Adam
-from utils import soft_update, hard_update
-from model import GaussianPolicy, QNetwork, DeterministicPolicy
+from rl.utils import soft_update, hard_update
+from rl.model import GaussianPolicy, QNetwork, DeterministicPolicy
 
 
 class SAC(object):

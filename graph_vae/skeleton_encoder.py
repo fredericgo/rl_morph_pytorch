@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Encoder(nn.Module):
+class SkeletonEncoder(nn.Module):
     def __init__(self, num_inputs, hidden_dim, latent_dim):
-        super(Encoder, self).__init__()
+        super(SkeletonEncoder, self).__init__()
 
         # projection networks
         self.linear1 = nn.Linear(num_inputs, hidden_dim)

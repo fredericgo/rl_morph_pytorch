@@ -1,6 +1,6 @@
 import argparse
 import datetime
-import gym
+import envs
 import numpy as np
 import itertools
 import torch
@@ -10,7 +10,7 @@ from rl.sac import SAC
 from rl.replay_memory import ReplayMemory
 
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-parser.add_argument('--env-name', default="Ant-v3",
+parser.add_argument('--env-name', default="ant",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
 parser.add_argument('--policy', default="Gaussian",
                     help='Policy Type: Gaussian | Deterministic (default: Gaussian)')
@@ -31,7 +31,7 @@ parser.add_argument('--seed', type=int, default=123456, metavar='N',
                     help='random seed (default: 123456)')
 parser.add_argument('--batch_size', type=int, default=256, metavar='N',
                     help='batch size (default: 256)')
-parser.add_argument('--num_steps', type=int, default=1000001, metavar='N',
+parser.add_argument('--num_steps', type=int, default=2000001, metavar='N',
                     help='maximum number of steps (default: 1000000)')
 parser.add_argument('--hidden_size', type=int, default=256, metavar='N',
                     help='hidden size (default: 256)')
@@ -51,7 +51,7 @@ args = parser.parse_args()
 
 # Environment
 # env = NormalizedActions(gym.make(args.env_name))
-env = gym.make(args.env_name)
+env = envs.load(args.env_name)
 env.seed(args.seed)
 env.action_space.seed(args.seed)
 
@@ -115,9 +115,8 @@ for i_episode in itertools.count(1):
         break
 
     writer.add_scalar('reward/train', episode_reward, i_episode)
-    print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
 
-    if i_episode % 10 == 0 and args.eval is True:
+    if i_episode % 100 == 0 and args.eval is True:
         avg_reward = 0.
         episodes = 10
         for _  in range(episodes):
