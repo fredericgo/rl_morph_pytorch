@@ -12,7 +12,8 @@ class MotionDecoder(nn.Module):
         self.linear3 = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, z_s, z_m):
-        x = F.relu(self.linear1(z_m))
+        z = torch.cat([z_s, z_m], -1)
+        x = F.relu(self.linear1(z))
         x = F.relu(self.linear2(x))
         x = self.linear3(x)
         return x

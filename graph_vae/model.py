@@ -9,10 +9,12 @@ class VAE(nn.Module):
         self.skeleton_encoder = skeleton_encoder
         self.decoder = decoder
                 
-    def forward(self, x):
+    def forward(self, _input):
+        x, y = _input
+        zs, _, _ = self.skeleton_encoder(y)
         zm, mean, log_var = self.motion_encoder(x)
 
-        x_hat            = self.decoder(None, zm)
+        x_hat = self.decoder(zs, zm)
         return x_hat, mean, log_var
 
     def save_model(self, path):
