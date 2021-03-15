@@ -11,7 +11,7 @@ class VAE(nn.Module):
                 
     def forward(self, _input):
         x, y = _input
-        zs, _, _ = self.skeleton_encoder(y)
+        zs = self.skeleton_encoder(y)
         zm, mean, log_var = self.motion_encoder(x)
 
         x_hat = self.decoder(zs, zm)

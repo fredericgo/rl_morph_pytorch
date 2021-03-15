@@ -14,16 +14,10 @@ class SkeletonEncoder(nn.Module):
         # mean and std projectors
         self.mean_layer = nn.Linear(hidden_dim, latent_dim)
         self.var_layer = nn.Linear(hidden_dim, latent_dim)
-
         self.training = True
 
     def forward(self, state):
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
-
         mu = self.mean_layer(x)
-        logvar = self.var_layer(x)
-        var    = torch.exp(0.5 * logvar)  # takes exponential function
-        epsilon = torch.rand_like(var)
-        z = mu + var * epsilon   
-        return z, mu, logvar
+        return mu

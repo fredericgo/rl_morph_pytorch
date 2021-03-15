@@ -44,7 +44,11 @@ parser.add_argument('--batch_size', type=int, default=128, metavar='N',
                     help='random seed (default: 123456)')
 parser.add_argument('--checkpoint_interval', type=int, default=100, 
                     help='checkpoint training model every # steps')
+parser.add_argument('--cuda', action="store_true",
+                    help='run on CUDA (default: False)')
 args = parser.parse_args()
+
+device = torch.device("cuda" if args.cuda else "cpu")
 
 env = envs.load(args.env1_name)
 env.seed(args.seed)
@@ -70,18 +74,20 @@ def collate_and_pad(batch):
         out_x[i, :length, ...] = state
         out_y.append(skeleton)
     out_y = torch.stack(out_y)
+    out_x = out_x.to(device=device)
+    out_y = out_y.to(device=device)
     return out_x, out_y
 
 state_size = env.observation_space.shape[0]
 motion_encoder = MotionEncoder(state_size, 
                   hidden_dim=args.hidden_dim,
-                  latent_dim=args.latent_dim)
+                  latent_dim=args.latent_dim).to(device=device)
 skeleton_encoder = SkeletonEncoder(2, 
                   hidden_dim=args.hidden_dim,
-                  latent_dim=args.latent_dim)
+                  latent_dim=args.latent_dim).to(device=device)
 decoder = MotionDecoder(args.latent_dim * 2,
                   hidden_dim=args.hidden_dim,
-                  output_dim=state_size)
+                  output_dim=state_size).to(device=device)
 model = VAE(motion_encoder, skeleton_encoder, decoder)
 
 #Tesnorboard
