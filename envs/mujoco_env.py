@@ -180,6 +180,12 @@ class MujocoEnv(gym.Env):
     def get_body_com(self, body_name):
         return self.data.get_body_xpos(body_name)
 
+    def get_body_xvelr(self, body_name):
+        return self.data.get_body_xvelr(body_name)
+
+    def get_body_xvelp(self, body_name):
+        return self.data.get_body_xvelp(body_name)
+
     def state_vector(self):
         return np.concatenate([
             self.sim.data.qpos.flat,

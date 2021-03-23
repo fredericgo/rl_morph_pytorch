@@ -1,42 +1,41 @@
 import numpy as np
+from os import path
+
 from gym import utils
 from . import mujoco_env
 
-class Ant1(mujoco_env.MujocoEnv, utils.EzPickle):
+
+class Ant3Jump(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
-        mujoco_env.MujocoEnv.__init__(self, 'ant1.xml', 5)
+        mujoco_env.MujocoEnv.__init__(self, 'ant3.xml', 5)
         utils.EzPickle.__init__(self)
 
     def step(self, a):
-        xposbefore = self.get_body_com("torso")[0]
+        xposbefore = self.get_body_com("torso")[2]
         self.do_simulation(a, self.frame_skip)
-        xposafter = self.get_body_com("torso")[0]
+        xposafter = self.get_body_com("torso")[2]
         forward_reward = (xposafter - xposbefore)/self.dt
+        forward_reward = forward_reward**2
         ctrl_cost = .5 * np.square(a).sum()
-        # minimize rotational velocity
-        vr = self.get_body_xvelr("torso")
-        rot_cost = .5 * np.square(vr).sum()
-        contact_cost = 0.5 * 1e-3 * np.sum(
-            np.square(np.clip(self.sim.data.cfrc_ext, -1, 1)))
+         
         survive_reward = 1.0
-        reward = (forward_reward - ctrl_cost 
-                 - contact_cost - rot_cost + survive_reward)
+        reward = forward_reward - ctrl_cost + survive_reward #- contact_cost
         state = self.state_vector()
         notdone = np.isfinite(state).all() \
-            and state[2] >= 0.26 and state[2] <= 1.0
+            and state[2] >= 0.27 and state[2] <= 1.0
         done = not notdone
         ob = self._get_obs()
         return ob, reward, done, dict(
             reward_forward=forward_reward,
             reward_ctrl=-ctrl_cost,
-            reward_contact=-contact_cost,
+            #reward_contact=-contact_cost,
             reward_survive=survive_reward)
 
     def _get_obs(self):
         return np.concatenate([
             self.sim.data.qpos.flat[2:],
             self.sim.data.qvel.flat,
-            np.clip(self.sim.data.cfrc_ext, -1, 1).flat,
+            #np.clip(self.sim.data.cfrc_ext, -1, 1).flat,
         ])
 
     def reset_model(self):
@@ -56,14 +55,24 @@ class Ant1(mujoco_env.MujocoEnv, utils.EzPickle):
         qvel = s[(nq-2):(nq-2+nv)]
         self.set_state(qpos, qvel)
 
+    @property
+    def joint_slice(self):
+        ndof = self.sim.model.nq - 2
+        return slice(5, ndof)
 
 if __name__ == "__main__":
+    from gym.wrappers import TimeLimit
 
-    env = Ant1()
+    env = Ant3()
+    env = TimeLimit(env, 2000)
 
     env.reset()
     for _ in range(1000):
         env.render()
         obs, reward, done, _ = env.step(env.action_space.sample())
+        print(obs.shape)
+        print(reward)
         if done:
             env.reset()
+
+    

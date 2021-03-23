@@ -13,10 +13,14 @@ class Ant2(mujoco_env.MujocoEnv, utils.EzPickle):
         xposafter = self.get_body_com("torso")[0]
         forward_reward = (xposafter - xposbefore)/self.dt
         ctrl_cost = .5 * np.square(a).sum()
+        # minimize rotational velocity
+        vr = self.get_body_xvelr("torso")
+        rot_cost = .5 * np.square(vr).sum()
         contact_cost = 0.5 * 1e-3 * np.sum(
             np.square(np.clip(self.sim.data.cfrc_ext, -1, 1)))
         survive_reward = 1.0
-        reward = forward_reward - ctrl_cost - contact_cost + survive_reward
+        reward = (forward_reward - ctrl_cost 
+                 - contact_cost - rot_cost + survive_reward)        
         state = self.state_vector()
         notdone = np.isfinite(state).all() \
             and state[2] >= 0.26 and state[2] <= 1.0
