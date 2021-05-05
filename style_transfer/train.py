@@ -14,11 +14,12 @@ from torch.nn import functional as F
 
 from torch.optim import Adam
 from torch.utils.data import DataLoader, ConcatDataset
-from graph_vae.replay_memory_dataset import ReplayMemoryDataset
-from graph_vae.skeleton_encoder import SkeletonEncoder
-from graph_vae.motion_encoder import MotionEncoder
-from graph_vae.motion_decoder import MotionDecoder
-from graph_vae.model import VAE
+from style_transfer.replay_memory_dataset import ReplayMemoryDataset
+from style_transfer.skeleton_template_dataset import SkeletonTemplateDataset
+from style_transfer.skeleton_encoder import SkeletonEncoder
+from style_transfer.motion_encoder import MotionEncoder
+from style_transfer.motion_decoder import MotionDecoder
+from style_transfer.ae import AE
 import envs
 
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
@@ -42,7 +43,7 @@ parser.add_argument('--epochs', type=int, default=2000, metavar='N',
                     help='random seed (default: 123456)')
 parser.add_argument('--batch_size', type=int, default=128, metavar='N',
                     help='random seed (default: 123456)')
-parser.add_argument('--checkpoint_interval', type=int, default=100, 
+parser.add_argument('--checkpoint_interval', type=int, default=10, 
                     help='checkpoint training model every # steps')
 parser.add_argument('--cuda', action="store_true",
                     help='run on CUDA (default: False)')
@@ -56,57 +57,52 @@ env.seed(args.seed)
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 
-dataset1 = ReplayMemoryDataset(args.agent_memory1, torch.tensor([1., 0.]))
-dataset2 = ReplayMemoryDataset(args.agent_memory2, torch.tensor([0., 1.]))
+dataset1 = ReplayMemoryDataset(args.agent_memory1)
+dataset2 = ReplayMemoryDataset(args.agent_memory2)
 combined_dataset = ConcatDataset([dataset1, dataset2])
 
 s1 = dataset1[0][0].size(0)
 s2 = dataset2[0][0].size(0)
-max_len = max(s1, s2)
+
+skeleton_dataset = SkeletonTemplateDataset([s1, s2])
+
+MAX_LEN = 27
 
 def collate_and_pad(batch):
     B = len(batch)
-    out_dims = (B, max_len)
+    out_dims = (B, MAX_LEN)
     out_x = batch[0][0].new_full(out_dims, 0.)
-    out_y = []
-    for i, (state, _, _, _, _, skeleton) in enumerate(batch):
+    for i, (state, _, _, _, _) in enumerate(batch):
         length = state.size(0)
         out_x[i, :length, ...] = state
-        out_y.append(skeleton)
-    out_y = torch.stack(out_y)
     out_x = out_x.to(device=device)
-    out_y = out_y.to(device=device)
-    return out_x, out_y
+    return out_x
 
 state_size = env.observation_space.shape[0]
-motion_encoder = MotionEncoder(state_size, 
-                  hidden_dim=args.hidden_dim,
-                  latent_dim=args.latent_dim).to(device=device)
-skeleton_encoder = SkeletonEncoder(2, 
-                  hidden_dim=args.hidden_dim,
-                  latent_dim=args.latent_dim).to(device=device)
-decoder = MotionDecoder(args.latent_dim * 2,
-                  hidden_dim=args.hidden_dim,
-                  output_dim=state_size).to(device=device)
-model = VAE(motion_encoder, skeleton_encoder, decoder)
+model = AE(state_size, state_size, args.hidden_dim, args.latent_dim).to(device=device)
+
+
 
 #Tesnorboard
 datetime_st = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-log_dir = f'runs/{datetime_st}_VAE_{args.env1_name}'
+log_dir = f'runs/{datetime_st}_StyleAE'
 writer = SummaryWriter(log_dir)
 
 dataloader = DataLoader(combined_dataset, batch_size=args.batch_size,
-                        collate_fn=collate_and_pad,
-                        shuffle=True, num_workers=0)
+                        collate_fn=collate_and_pad, drop_last=True,
+                        shuffle=True, num_workers=2)
+skeleton_loader = DataLoader(skeleton_dataset, batch_size=args.batch_size, num_workers=0)
+skeleton_iter = iter(itertools.cycle(skeleton_loader))
 
-def loss_function(x, x_hat, mean, log_var):
-    reproduction_loss = F.mse_loss(x_hat, x)
-    KLD = -0.5 * torch.mean(
-        torch.sum(1+ log_var - mean.pow(2) - log_var.exp(), dim=1), dim=0)
-    return reproduction_loss + KLD
+def style_trasfer_loss(f, x, s, x_hat):
+    dt = f(x_hat, s) - f(x, s)
+    content_loss = torch.sum(torch.norm(dt, p=2, dim=-1))
+    ds = f.skeleton_encoder(x_hat) - f.skeleton_encoder(s)
+    style_loss = torch.sum(torch.norm(ds, p=2, dim=-1))
+    return content_loss + style_loss
 
 optimizer = Adam(model.parameters(), lr=args.lr)
-print("Start training VAE...")
+print("Start training StyleAE...")
 model.train()
 
 epoch = 0
@@ -114,18 +110,20 @@ epoch = 0
 for epoch in range(args.epochs):
     overall_loss = 0
 
-    for batch_idx, batch, in enumerate(dataloader):
+    for batch_idx, x, in enumerate(dataloader):
+        s = next(skeleton_iter)
+   
         optimizer.zero_grad()
+        x_hat = model(x, s)
+        
     
-        x_hat, mu, logvar = model(batch)
-    
-        loss = loss_function(batch[0], x_hat, mu, logvar)
+        loss = style_trasfer_loss(model.f,
+                                  x, s, x_hat)
         overall_loss += loss.item()
         
         loss.backward()
         optimizer.step()
     avg_loss = overall_loss / (batch_idx * args.batch_size)
-    writer.add_scalar('Model/logvar', torch.mean(logvar), epoch)
 
     writer.add_scalar('loss', avg_loss, epoch)
 

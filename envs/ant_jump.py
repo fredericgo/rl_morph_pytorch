@@ -4,7 +4,8 @@ from . import mujoco_env
 
 class AntJump(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
-        mujoco_env.MujocoEnv.__init__(self, 'ant.xml', 5)
+        self.xml = 'ant.xml'
+        mujoco_env.MujocoEnv.__init__(self, self.xml, 5)
         utils.EzPickle.__init__(self)
 
     def step(self, a):

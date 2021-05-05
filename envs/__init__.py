@@ -8,6 +8,7 @@ from .ant3 import Ant3
 from .ant_jump import AntJump
 from .ant_turn import AntTurn
 from .ant3_jump import Ant3Jump
+from .ant3_turn import Ant3Turn
 from .ant2_jump import Ant2Jump
 
 
@@ -28,6 +29,8 @@ def load(env_name):
         env = Ant3()
     elif env_name == "ant3-jump":
         env = Ant3Jump()
+    elif env_name == "ant3-turn":
+        env = Ant3Turn()
     else:
         raise ValueError
 

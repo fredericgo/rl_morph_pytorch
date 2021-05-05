@@ -8,12 +8,10 @@ import imageio
 import envs
 
 from torch.utils.data import DataLoader, ConcatDataset
-from graph_vae.replay_memory_dataset import ReplayMemoryDataset
-from graph_vae.skeleton_encoder import SkeletonEncoder
-from graph_vae.motion_encoder import MotionEncoder
-from graph_vae.motion_decoder import MotionDecoder
-from graph_vae.model import VAE
+from style_transfer.replay_memory_dataset import ReplayMemoryDataset
+from style_transfer.ae import AE
 
+MAX_LEN = 27
 
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
 parser.add_argument('--env1-name', default="ant",
@@ -39,6 +37,7 @@ parser.add_argument('--video_file_name',
                     help='output file name')
 args = parser.parse_args()
 
+
 # Environment
 # env = NormalizedActions(gym.make(args.env_name))
 env1 = envs.load(args.env1_name)
@@ -50,19 +49,16 @@ np.random.seed(args.seed)
 # Agent
 device = torch.device("cuda" if args.cuda else "cpu")
 
-dataset1 = ReplayMemoryDataset(args.agent_memory1, torch.tensor([0., 1.]))
+dataset1 = ReplayMemoryDataset(args.agent_memory1)
+
+s1 = dataset1[0][0].size(0)
+
+style = torch.zeros(MAX_LEN)
+style[:s1] = 1.
 
 state_size = env1.observation_space.shape[0]
-motion_encoder = MotionEncoder(state_size, 
-                  hidden_dim=args.hidden_dim,
-                  latent_dim=args.latent_dim).to(device=device)
-skeleton_encoder = SkeletonEncoder(2, 
-                  hidden_dim=args.hidden_dim,
-                  latent_dim=args.latent_dim).to(device=device)
-decoder = MotionDecoder(args.latent_dim * 2,
-                  hidden_dim=args.hidden_dim,
-                  output_dim=state_size).to(device=device)
-model = VAE(motion_encoder, skeleton_encoder, decoder)
+
+model = AE(state_size, state_size, args.hidden_dim, args.latent_dim).to(device=device)
 
 model.load_model(args.model_path)
 
@@ -76,10 +72,11 @@ state = render_env.reset()
 with imageio.get_writer(args.video_file_name, fps=30) as video:
     for idx, x, in enumerate(dataset1):
         state = x[0]
-        label = x[5]
-        x_hat, _, _ = model((state, label))
+        x_hat = model(state, style)
+        print(x_hat)
+        #x_hat = torch.zeros_like(x_hat)
         render_env.set_to_observation(x_hat.detach().numpy())
-        video.append_data(env1.render('rgb_array'))
+        video.append_data(render_env.render('rgb_array'))
 
         if idx > 1000:
             break

@@ -1,10 +1,13 @@
 import numpy as np
+from os import path
+
 from gym import utils
 from . import mujoco_env
 
-class AntTurn(mujoco_env.MujocoEnv, utils.EzPickle):
+
+class Ant3Turn(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
-        self.xml = 'ant.xml'
+        self.xml = 'ant3.xml'
         mujoco_env.MujocoEnv.__init__(self, self.xml, 5)
         utils.EzPickle.__init__(self)
 
@@ -13,21 +16,19 @@ class AntTurn(mujoco_env.MujocoEnv, utils.EzPickle):
 
         vr = self.get_body_xvelr("torso")[2]
         rot_reward = vr
-        ctrl_cost = 0.5 * np.square(a).sum()
-        contact_cost = 0.5 * 1e-3 * np.sum(
-            np.square(np.clip(self.sim.data.cfrc_ext, -1, 1)))
-        survive_reward = 0.2
-        reward = (rot_reward 
-                  - ctrl_cost + survive_reward)
+        ctrl_cost = .5 * np.square(a).sum()
+         
+        survive_reward = 1.0
+        reward = rot_reward - ctrl_cost + survive_reward #- contact_cost
         state = self.state_vector()
         notdone = np.isfinite(state).all() \
-            and state[2] >= 0.2 and state[2] <= 1.0
+            and state[2] >= 0.27 and state[2] <= 1.0
         done = not notdone
         ob = self._get_obs()
         return ob, reward, done, dict(
-            rot_forward=rot_reward,
+            rot=rot_reward,
             reward_ctrl=-ctrl_cost,
-            reward_contact=-contact_cost,
+            #reward_contact=-contact_cost,
             reward_survive=survive_reward)
 
     def _get_obs(self):
@@ -54,15 +55,24 @@ class AntTurn(mujoco_env.MujocoEnv, utils.EzPickle):
         qvel = s[(nq-2):(nq-2+nv)]
         self.set_state(qpos, qvel)
 
+    @property
+    def joint_slice(self):
+        ndof = self.sim.model.nq - 2
+        return slice(5, ndof)
 
 if __name__ == "__main__":
+    from gym.wrappers import TimeLimit
 
-    env = AntEnv()
+    env = Ant3()
+    env = TimeLimit(env, 2000)
 
     env.reset()
     for _ in range(1000):
         env.render()
         obs, reward, done, _ = env.step(env.action_space.sample())
+        print(obs.shape)
         print(reward)
         if done:
             env.reset()
+
+    

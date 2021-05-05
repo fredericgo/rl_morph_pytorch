@@ -7,6 +7,7 @@ from . import mujoco_env
 
 class Ant3(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
+        
         mujoco_env.MujocoEnv.__init__(self, 'ant3.xml', 5)
         utils.EzPickle.__init__(self)
 
