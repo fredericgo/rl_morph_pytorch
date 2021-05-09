@@ -1,11 +1,12 @@
 import numpy as np
 from gym import utils
-from . import mujoco_env
+from gym.envs.mujoco import mujoco_env
 
-class Ant1(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self):
-        self.xml = 'ant1.xml'
-        mujoco_env.MujocoEnv.__init__(self, self.xml, 5)
+
+class Env(mujoco_env.MujocoEnv, utils.EzPickle):
+    def __init__(self, xml):
+        self.xml = xml
+        mujoco_env.MujocoEnv.__init__(self, self.xml, 4)
         utils.EzPickle.__init__(self)
 
     def step(self, a):

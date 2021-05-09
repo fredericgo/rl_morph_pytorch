@@ -1,18 +1,18 @@
 import argparse
 import datetime
-import gym
 import numpy as np
 import itertools
 import torch
 import imageio
 import envs
+import gym
 
 from rl.sac import SAC
 from rl.replay_memory import ReplayMemory
 from rl.model import GaussianPolicy, QNetwork, DeterministicPolicy
 
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-parser.add_argument('--env-name', default="ant2",
+parser.add_argument('--env-name', default="ant-v0",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
 parser.add_argument('--policy', default="Gaussian",
                     help='Policy Type: Gaussian | Deterministic (default: Gaussian)')
@@ -32,7 +32,8 @@ args = parser.parse_args()
 
 # Environment
 # env = NormalizedActions(gym.make(args.env_name))
-env = envs.load(args.env_name)
+env = gym.make(args.env_name)
+
 env.seed(args.seed)
 env.action_space.seed(args.seed)
 

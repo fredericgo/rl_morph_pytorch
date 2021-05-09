@@ -1,10 +1,11 @@
 import numpy as np
 from gym import utils
-from . import mujoco_env
+from gym.envs.mujoco import mujoco_env
 
-class Ant2(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self):
-        self.xml = 'ant2.xml'
+
+class Env(mujoco_env.MujocoEnv, utils.EzPickle):
+    def __init__(self, xml):
+        self.xml = xml
         mujoco_env.MujocoEnv.__init__(self, self.xml, 5)
         utils.EzPickle.__init__(self)
 
@@ -15,7 +16,7 @@ class Ant2(mujoco_env.MujocoEnv, utils.EzPickle):
         forward_reward = (xposafter - xposbefore)/self.dt
         ctrl_cost = .5 * np.square(a).sum()
         # minimize rotational velocity
-        vr = self.get_body_xvelr("torso")
+        vr = self.data.get_body_xvelr("torso")
         rot_cost = .5 * np.square(vr).sum()
         contact_cost = 0.5 * 1e-3 * np.sum(
             np.square(np.clip(self.sim.data.cfrc_ext, -1, 1)))
