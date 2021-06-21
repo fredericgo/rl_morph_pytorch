@@ -23,7 +23,7 @@ from padding_onehot.model import VAE
 import envs
 
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-parser.add_argument('--env1-name', default="ant",
+parser.add_argument('--env1-name', default="ant-v0",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
 parser.add_argument('--env2-name', default="ant3",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
@@ -51,7 +51,7 @@ args = parser.parse_args()
 
 device = torch.device("cuda" if args.cuda else "cpu")
 
-env = envs.load(args.env1_name)
+env = gym.make(args.env1_name)
 env.seed(args.seed)
 
 torch.manual_seed(args.seed)

@@ -1,7 +1,7 @@
 import numpy as np
+from os import path
 from gym import utils
 from gym.envs.mujoco import mujoco_env
-from envs.utils import *
 
 
 class Env(mujoco_env.MujocoEnv, utils.EzPickle):
@@ -11,13 +11,15 @@ class Env(mujoco_env.MujocoEnv, utils.EzPickle):
         utils.EzPickle.__init__(self)
 
     def step(self, a):
-        xposbefore = self.sim.data.qpos[0]
+        xposbefore = self.sim.data.qpos[2]
         self.do_simulation(a, self.frame_skip)
-        xposafter = self.sim.data.qpos[0]
+        xposafter = self.sim.data.qpos[2]
         reward_ctrl = - 0.5 * np.square(a).sum()
-        reward_run = (xposafter - xposbefore)/self.dt
+        up_reward = (xposafter - xposbefore)/self.dt
+        reward_jump = up_reward**2
+
         survive_reward = 1.0
-        reward = reward_ctrl + reward_run + survive_reward
+        reward = reward_ctrl + reward_jump + survive_reward
 
         state = self.state_vector()
         notdone = np.isfinite(state).all() \
@@ -25,17 +27,11 @@ class Env(mujoco_env.MujocoEnv, utils.EzPickle):
         done = not notdone
         ob = self._get_obs()
         return ob, reward, done, dict(
-            reward_run=reward_run,
+            reward_jump=reward_jump,
             reward_ctrl=-reward_ctrl)
 
     def _get_obs(self):
         def _get_obs_per_limb(b):
-            torso_x_pos = self.data.get_body_xpos('torso')[0]
-            xpos = self.data.get_body_xpos(b)
-            xpos[0] -= torso_x_pos
-            q = self.data.get_body_xquat(b)
-            expmap = quat2expmap(q)
-            #obs = np.concatenate([xpos, expmap])
             if b == 'torso':
                 body_id = self.sim.model.body_name2id(b)
                 jnt_adr = self.sim.model.body_jntadr[body_id]
@@ -60,6 +56,7 @@ class Env(mujoco_env.MujocoEnv, utils.EzPickle):
             return obs
         full_obs = np.concatenate([_get_obs_per_limb(b) for b in self.model.body_names[1:]])
         return full_obs.ravel()
+
 
     def reset_model(self):
         qpos = self.init_qpos + self.np_random.uniform(size=self.model.nq, low=-.1, high=.1)
@@ -98,6 +95,24 @@ class Env(mujoco_env.MujocoEnv, utils.EzPickle):
         qpos = np.concatenate([xy, qpos])
         self.set_state(qpos, qvel)
 
+    @property
+    def joint_slice(self):
+        ndof = self.sim.model.nq - 2
+        return slice(5, ndof)
 
+if __name__ == "__main__":
+    from gym.wrappers import TimeLimit
 
+    env = Ant3()
+    env = TimeLimit(env, 2000)
 
+    env.reset()
+    for _ in range(1000):
+        env.render()
+        obs, reward, done, _ = env.step(env.action_space.sample())
+        print(obs.shape)
+        print(reward)
+        if done:
+            env.reset()
+
+    

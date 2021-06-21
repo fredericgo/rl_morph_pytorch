@@ -20,12 +20,13 @@ class GraphEncoder(torch.nn.Module):
         self.attention = GlobalAttention(nn.Linear(hidden_dim, 1))
 
     def forward(self, data):
-        batch, x, edge_index, edge_weight = data.batch, data.x, data.edge_index, data.edge_attr
-        x = self.conv1(x, edge_index) #edge_weight=edge_weight)
+
+        batch, x, edge_index = data.batch, data.x, data.edge_index
+        x = self.conv1(x, edge_index) 
         
         x = F.relu(x)
         x = F.dropout(x, training=self.training)
-        x = self.conv2(x, edge_index) #edge_weight=edge_weight)
+        x = self.conv2(x, edge_index) 
         #x = global_mean_pool(x, batch)
         x = self.attention(x, batch)
         mu = self.mean_layer(x)

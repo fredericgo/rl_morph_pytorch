@@ -16,8 +16,10 @@ class Env(mujoco_env.MujocoEnv, utils.EzPickle):
         xposafter = self.sim.data.qpos[0]
         reward_ctrl = - 0.5 * np.square(a).sum()
         reward_run = (xposafter - xposbefore)/self.dt
+        vr = self.sim.data.get_body_xvelr("torso")[2]
+        reward_rot = vr.sum()
         survive_reward = 1.0
-        reward = reward_ctrl + reward_run + survive_reward
+        reward = reward_ctrl + reward_rot + survive_reward
 
         state = self.state_vector()
         notdone = np.isfinite(state).all() \

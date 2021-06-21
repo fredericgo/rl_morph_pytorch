@@ -28,7 +28,7 @@
         <body name="aux_1" pos="0.2 0 0">
           <joint axis="0 0 1" name="hip_1" pos="0.0 0.0 0.0" range="-40 40" type="hinge"/>
           <geom fromto="0.0 0.0 0.0 0.2 0 0.0" name="left_leg_geom" size="0.08" type="capsule" rgba=".8 .5 .3 1"/>
-          <body pos="0.2 0 0" name="front_left_foot">
+          <body name="front_left_foot" pos="0.2 0 0">
             <joint axis="0 1 0" name="ankle_1" pos="0.0 0.0 0.0" range="30 100" type="hinge"/>
             <geom fromto="0.0 0.0 0.0 0.4 0 0.0" name="left_ankle_geom" size="0.08" type="capsule" rgba=".8 .5 .3 1"/>
           </body>
@@ -39,7 +39,7 @@
         <body name="aux_4" pos="-0.2 0 0">
           <joint axis="0 0 1" name="hip_4" pos="0.0 0.0 0.0" range="-40 40" type="hinge"/>
           <geom fromto="0.0 0.0 0.0 -0.2 0.0 0.0" name="rightback_leg_geom" size="0.08" type="capsule" rgba=".8 .5 .3 1"/>
-          <body pos="-0.2 0 0" name="right_back_foot">
+          <body name="right_back_foot" pos="-0.2 0 0">
             <joint axis="0 -1 0" name="ankle_4" pos="0.0 0.0 0.0" range="30 100" type="hinge"/>
             <geom fromto="0.0 0.0 0.0 -0.4 0.0 0.0" name="fourth_ankle_geom" size="0.08" type="capsule" rgba=".8 .5 .3 1"/>
           </body>
@@ -48,9 +48,9 @@
     </body>
   </worldbody>
   <actuator>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="hip_4" gear="150"/>
-    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="ankle_4" gear="150"/>
     <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="hip_1" gear="150"/>
     <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="ankle_1" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="hip_4" gear="150"/>
+    <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="ankle_4" gear="150"/>
   </actuator>
 </mujoco>

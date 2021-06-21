@@ -10,36 +10,53 @@ class Env(mujoco_env.MujocoEnv, utils.EzPickle):
         utils.EzPickle.__init__(self)
 
     def step(self, a):
-        xposbefore = self.get_body_com("torso")[0]
+        xposbefore = self.sim.data.qpos[0]
         self.do_simulation(a, self.frame_skip)
-        xposafter = self.get_body_com("torso")[0]
-        forward_reward = (xposafter - xposbefore)/self.dt
-        ctrl_cost = .5 * np.square(a).sum()
-        # minimize rotational velocity
-        vr = self.data.get_body_xvelr("torso")
-        rot_cost = .5 * np.square(vr).sum()
-        contact_cost = 0.5 * 1e-3 * np.sum(
-            np.square(np.clip(self.sim.data.cfrc_ext, -1, 1)))
+        xposafter = self.sim.data.qpos[0]
+        reward_ctrl = - 0.5 * np.square(a).sum()
+        reward_run = (xposafter - xposbefore)/self.dt
         survive_reward = 1.0
-        reward = (forward_reward - ctrl_cost 
-                 - contact_cost - rot_cost + survive_reward)        
+        vr = self.data.get_body_xvelr("torso")
+        reward_rot = -.5 * np.square(vr).sum()
+        reward = (reward_ctrl + reward_run + 
+                  survive_reward + reward_rot)
+
         state = self.state_vector()
         notdone = np.isfinite(state).all() \
             and state[2] >= 0.26 and state[2] <= 1.0
         done = not notdone
         ob = self._get_obs()
         return ob, reward, done, dict(
-            reward_forward=forward_reward,
-            reward_ctrl=-ctrl_cost,
-            reward_contact=-contact_cost,
-            reward_survive=survive_reward)
+            reward_run=reward_run,
+            reward_ctrl=-reward_ctrl,
+            reward_rot=-reward_rot)
 
     def _get_obs(self):
-        return np.concatenate([
-            self.sim.data.qpos.flat[2:],
-            self.sim.data.qvel.flat,
-            np.clip(self.sim.data.cfrc_ext, -1, 1).flat,
-        ])
+        def _get_obs_per_limb(b):
+            if b == 'torso':
+                body_id = self.sim.model.body_name2id(b)
+                jnt_adr = self.sim.model.body_jntadr[body_id]
+                qpos_adr = self.sim.model.jnt_qposadr[jnt_adr] # assuming each body has only one joint
+                angle = self.data.qpos[(qpos_adr+2):(qpos_adr+7)] # angle of 
+                dof_adr = self.sim.model.jnt_dofadr[jnt_adr]
+                qvel = self.data.qvel[dof_adr:(dof_adr+6)]
+            else:
+                body_id = self.sim.model.body_name2id(b)
+                jnt_adr = self.sim.model.body_jntadr[body_id]
+                qpos_adr = self.sim.model.jnt_qposadr[jnt_adr] # assuming each body has only one joint
+                angle = self.data.qpos[qpos_adr] # angle of current joint, scalar
+                dof_adr = self.sim.model.jnt_dofadr[jnt_adr]
+                qvel = self.data.qvel[dof_adr]
+                if jnt_adr < 0:
+                    angle = [0.]
+                    qvel = [0.]
+                else:
+                    angle = [angle]
+                    qvel = [qvel]
+            obs = np.concatenate([angle, qvel])
+            return obs
+        full_obs = np.concatenate([_get_obs_per_limb(b) for b in self.model.body_names[1:]])
+        return full_obs.ravel()
 
     def reset_model(self):
         qpos = self.init_qpos + self.np_random.uniform(size=self.model.nq, low=-.1, high=.1)

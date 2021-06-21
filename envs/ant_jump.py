@@ -11,13 +11,15 @@ class Env(mujoco_env.MujocoEnv, utils.EzPickle):
         utils.EzPickle.__init__(self)
 
     def step(self, a):
-        xposbefore = self.sim.data.qpos[0]
+        xposbefore = self.sim.data.qpos[2]
         self.do_simulation(a, self.frame_skip)
-        xposafter = self.sim.data.qpos[0]
+        xposafter = self.sim.data.qpos[2]
         reward_ctrl = - 0.5 * np.square(a).sum()
-        reward_run = (xposafter - xposbefore)/self.dt
+        up_reward = (xposafter - xposbefore)/self.dt
+        reward_jump = up_reward**2
+
         survive_reward = 1.0
-        reward = reward_ctrl + reward_run + survive_reward
+        reward = reward_ctrl + reward_jump + survive_reward
 
         state = self.state_vector()
         notdone = np.isfinite(state).all() \
@@ -25,7 +27,7 @@ class Env(mujoco_env.MujocoEnv, utils.EzPickle):
         done = not notdone
         ob = self._get_obs()
         return ob, reward, done, dict(
-            reward_run=reward_run,
+            reward_jump=reward_jump,
             reward_ctrl=-reward_ctrl)
 
     def _get_obs(self):
@@ -69,35 +71,6 @@ class Env(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def viewer_setup(self):
         self.viewer.cam.distance = self.model.stat.extent * 0.5
-
-    def set_to_observation(self, s): 
-        qpos = []
-        qvel = []
-        qpos.append(s[:5])
-        qvel.append(s[5:11])
-        i = 11
-        for b in self.model.body_names[2:]:
-            body_id = self.sim.model.body_name2id(b)
-            jnt_adr = self.sim.model.body_jntadr[body_id]
-            if jnt_adr < 0:
-                i += 2
-                q = []
-                v = []
-            else:
-                q = s[i:i+1]
-                v = s[(i+1):(i+2)]
-                i += 2
-
-            qpos.append(q)
-            qvel.append(v)
-
-        qpos = np.concatenate(qpos)
-        qvel = np.concatenate(qvel)
-  
-        xy = self.init_qpos[:2]
-        qpos = np.concatenate([xy, qpos])
-        self.set_state(qpos, qvel)
-
 
 
 

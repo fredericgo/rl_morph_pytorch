@@ -18,7 +18,7 @@ class GraphDataset(Dataset):
 
     def __getitem__(self, idx):
         data = self.raw_data[idx]
-        g = self.skeleton.data_to_graph(data, self._max_nodes)
+        g = self.skeleton.data_to_graph(data)
         return g
         print(g)
         node_feature = torch.as_tensor([self.data[n][3] for n in self.graph.nodes], dtype=torch.float32)

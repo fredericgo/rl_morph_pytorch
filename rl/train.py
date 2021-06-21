@@ -1,7 +1,8 @@
 import argparse
 import datetime
-import envs
 import gym
+import envs
+
 import numpy as np
 import itertools
 import torch
@@ -11,7 +12,7 @@ from rl.sac import SAC
 from rl.replay_memory import ReplayMemory
 
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-parser.add_argument('--env-name', default="ant2-v0",
+parser.add_argument('--env-name', default="ant_turnleft-v0",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
 parser.add_argument('--policy', default="Gaussian",
                     help='Policy Type: Gaussian | Deterministic (default: Gaussian)')
@@ -47,6 +48,10 @@ parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
 parser.add_argument('--cuda', action="store_true",
                     help='run on CUDA (default: False)')
 parser.add_argument('--checkpoint_interval', type=int, default=500, 
+                    help='checkpoint training model every # steps')
+parser.add_argument('--log_interval', type=int, default=10, 
+                    help='checkpoint training model every # steps')
+parser.add_argument('--eval_interval', type=int, default=100, 
                     help='checkpoint training model every # steps')
 args = parser.parse_args()
 
@@ -92,7 +97,6 @@ for i_episode in itertools.count(1):
             for i in range(args.updates_per_step):
                 # Update parameters of all the networks
                 critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agent.update_parameters(memory, args.batch_size, updates)
-
                 writer.add_scalar('loss/critic_1', critic_1_loss, updates)
                 writer.add_scalar('loss/critic_2', critic_2_loss, updates)
                 writer.add_scalar('loss/policy', policy_loss, updates)
@@ -115,10 +119,11 @@ for i_episode in itertools.count(1):
 
     if total_numsteps > args.num_steps:
         break
+        
+    if i_episode % args.log_interval == 0:
+        writer.add_scalar('reward/train', episode_reward, i_episode)
 
-    writer.add_scalar('reward/train', episode_reward, i_episode)
-
-    if i_episode % 100 == 0 and args.eval is True:
+    if i_episode % args.eval_interval == 0 and args.eval is True:
         avg_reward = 0.
         episodes = 10
         for _  in range(episodes):

@@ -16,7 +16,7 @@ from torch.optim import Adam
 from torch.utils.data import  ConcatDataset
 from torch_geometric.data import DataLoader
 
-from skeleton_graph_vae.skeleton import Skeleton
+from skeleton_graph_vae.structure import Structure
 from skeleton_graph_vae.graph_dataset import GraphDataset
 
 from skeleton_graph_vae.graph_encoder import GraphEncoder
@@ -25,9 +25,9 @@ from skeleton_graph_vae.model import VAE
 import envs
 
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-parser.add_argument('--env1-name', default="ant",
+parser.add_argument('--env1-name', default="ant-v0",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
-parser.add_argument('--env2-name', default="ant3",
+parser.add_argument('--env2-name', default="ant3-v0",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
 parser.add_argument('--agent_memory1', default='data/ant.memory',
                     help='Path for saved replay memory')
@@ -49,38 +49,40 @@ parser.add_argument('--checkpoint_interval', type=int, default=100,
                     help='checkpoint training model every # steps')
 parser.add_argument('--cuda', action="store_true",
                     help='run on CUDA (default: False)')
-parser.add_argument('--n_nodes', type=int, default=17,
+parser.add_argument('--n_nodes', type=int, default=13,
                     help='max number of nodes in decoder')
 args = parser.parse_args()
 
 device = torch.device("cuda" if args.cuda else "cpu")
 
-env = envs.load(args.env1_name)
+env = gym.make(args.env1_name)
 env.seed(args.seed)
 
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 
-ant_paths = ["data/ant.memory", "data/ant_jump.memory", "data/ant_turn.memory"]
+ant_paths = ["data/ant.memory"]
 
-skeleton1 = Skeleton("envs/assets/ant.xml")
+skeleton1 = Structure(env.xml)
 datasets = []
 for p in ant_paths:
     datasets.append(GraphDataset(p, skeleton1, max_nodes=args.n_nodes))
 
-ant3_paths = ["data/ant3.memory", "data/ant3_jump.memory", "data/ant3_turn.memory"]
-skeleton_ant3 = Skeleton("envs/assets/ant3.xml")
+ant3_paths = ["data/ant3.memory"]
+env2 = gym.make(args.env2_name)
+
+skeleton_ant3 = Structure(env2.xml)
 
 for p in ant3_paths:
     datasets.append(GraphDataset(p, skeleton_ant3, max_nodes=args.n_nodes))
 
 combined_dataset = ConcatDataset(datasets)
 
-input_size = 1
+input_size = 2
 
 encoder = GraphEncoder(input_size, 
-                              args.hidden_dim, 
-                              args.latent_dim).to(device=device)
+                        args.hidden_dim, 
+                        args.latent_dim).to(device=device)
 
 decoder = GraphDecoder(args.latent_dim,
                    args.hidden_dim,
