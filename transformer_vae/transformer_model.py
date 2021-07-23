@@ -1,7 +1,5 @@
 import torch
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 import os
 import math
 import torch
@@ -100,13 +98,14 @@ class TransformerModel(nn.Module):
     def forward(self, src, src_topology, tgt_topology):
         # add root postions and rotations (dummy)
         
-        root = torch.zeros(1, src.size(1), 2)
+        root = torch.zeros(1, src.size(1), 2, device=src.device)
+    
         src = torch.cat([root, src], 0)
         encoded = self.encoder(src) * math.sqrt(self.ninp)
         #encoded += self.pe(src_topology) + self.sturcture_emb(src_topology)
-
         z = self.transformer_encoder(encoded)
         c = self.pe(tgt_topology) + self.sturcture_emb(tgt_topology)
+        z = z[0]
         #if self.condition_decoder:
         #    output = torch.cat([output, src], axis=2)
         output = self.transformer_decoder(c, z)
@@ -134,7 +133,7 @@ class TransformerVAE(nn.Module):
         self.batch_size = batch_size
         self.state_dim = state_dim
 
-        self.encoder = TransformerModel(
+        encoder = TransformerModel(
             self.state_dim,
             args.attention_embedding_size,
             args.attention_heads,
@@ -143,7 +142,9 @@ class TransformerVAE(nn.Module):
             self.max_num_limbs,
             args.dropout_rate,
             transformer_norm=args.transformer_norm,
-        ).to(device)
+        )
+
+        self.add_module("encoder", encoder)
 
     def forward(self, x, mode="train"):
         state, src_topology, tgt_topology = x

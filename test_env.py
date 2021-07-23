@@ -2,10 +2,10 @@ from gym.envs.registration import register
 import gym 
 import os
 
-import envs
+import env
 
 
-env = gym.make("ant2-v0")
+env = gym.make("ant-walk-v0")
 
 env.reset()
 for _ in range(1000):

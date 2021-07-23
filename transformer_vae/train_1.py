@@ -17,11 +17,11 @@ from torch.utils.data import ConcatDataset
 from torch.utils.data import DataLoader
 
 from transformer_vae.util import getGraphStructure
-from transformer_vae.replay_memory import ReplayMemoryDataset
 from transformer_vae.transformer_model import TransformerVAE
 from transformer_vae import util
 from transformer_vae.config import *
 from transformer_vae.arguments import get_args
+from transformer_vae.data_loader import PairedDataset
 
 import envs
 
@@ -35,28 +35,28 @@ env.seed(args.seed)
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 
-env_names = ["ant-v0", "ant3-v0", "ant_jump-v0", "ant3_jump-v0"]
+env_names = ["ant-v0", "ant3-v0", "ant_jump-v0", "ant3_jump-v0"]#"ant_a-v0", "ant_b-v0"]
 train_envs = [gym.make(n) for n in env_names]
 graphs = [getGraphStructure(e.xml) for e in train_envs]
 # All environments have the same dimension per limb.
 num_limbs = len(graphs[0])  #torso + body limbs
 body_limbs = num_limbs - 1
-dim_per_limb = int((train_envs[0].observation_space.shape[0] - ROOT_DIM) / (body_limbs - 1))
+dim_per_limb = int((train_envs[0].observation_space.shape[0] - args.root_size) / (body_limbs - 1))
 max_num_limbs = max(len(g) for g in graphs)
 
+args.dim_per_limb = dim_per_limb
+args.max_num_limbs = max_num_limbs
 
 root_dir = util.get_project_root()
-datasets = []
-for i, n in enumerate(env_names):
-    memory_file = root_dir / f"data/{n[:-3]}.memory" 
-    datasets.append(
-        ReplayMemoryDataset(
-            memory_file, 
-            graphs[i],
-            dim_per_limb, 
-            max_num_limbs))
 
-combined_dataset = ConcatDataset(datasets)
+xml_files = [env.xml for env in train_envs]
+memory_files = [str(root_dir / f"data/{n[:-3]}.memory")  for n in env_names]
+dataset = PairedDataset(
+            memory_files,
+            xml_files,
+            dim_per_limb, 
+            max_num_limbs,
+            args.root_size)
 
 
 model = TransformerVAE(
@@ -72,7 +72,7 @@ datetime_st = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 log_dir = f'runs/{datetime_st}_VAE_{args.env1_name}_both'
 writer = SummaryWriter(log_dir)
 
-dataloader = DataLoader(combined_dataset, 
+dataloader = DataLoader(dataset, 
                         batch_size=args.batch_size,
                         drop_last=True,
                         shuffle=True, num_workers=8)
@@ -104,7 +104,7 @@ for epoch in range(args.epochs):
         optimizer.zero_grad()
 
         batch = [x.to(device) for x in batch]
-        src, top = batch
+        src, src2, top = batch
         batch = src, top, top
         x_hat = model(batch)
         loss, info = loss_function(batch, x_hat)

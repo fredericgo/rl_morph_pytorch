@@ -29,7 +29,8 @@ def get_args():
                         help='run on CUDA (default: False)')
     parser.add_argument('--msg_dim', type=int, default=32,
                         help='run on CUDA (default: False)')
-
+    parser.add_argument('--root_size', type=int, default=11,
+                        help='root dimension')
     parser.add_argument(
         "--condition_decoder_on_features",
         default=0,

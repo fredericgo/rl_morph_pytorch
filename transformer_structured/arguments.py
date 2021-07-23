@@ -3,23 +3,16 @@ import argparse
 
 def get_args():
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-    parser.add_argument('--env1-name', default="ant-v0",
-                        help='Mujoco Gym environment (default: HalfCheetah-v2)')
-    parser.add_argument('--env2-name', default="ant3-v0",
-                        help='Mujoco Gym environment (default: HalfCheetah-v2)')
-    parser.add_argument('--agent_memory1', default='data/ant.memory',
-                        help='Path for saved replay memory')
-    parser.add_argument('--agent_memory2', default='data/ant3.memory',
-                        help='Path for saved replay memory')
+  
     parser.add_argument('--hidden_dim', type=int, default=512,
                         help='MLP hidden dimension')
-    parser.add_argument('--latent_dim', type=int, default=5,
+    parser.add_argument('--latent_dim', type=int, default=128,
                         help='Encoder latent dimension')
     parser.add_argument('--seed', type=int, default=123456, metavar='N',
                         help='random seed (default: 123456)')
     parser.add_argument('--lr', type=float, default=1e-4, metavar='N',
                         help='random seed (default: 123456)')
-    parser.add_argument('--epochs', type=int, default=5000, metavar='N',
+    parser.add_argument('--epochs', type=int, default=400, metavar='N',
                         help='random seed (default: 123456)')
     parser.add_argument('--generator_times', type=int, default=2, metavar='N',
                         help='random seed (default: 123456)')
@@ -35,6 +28,7 @@ def get_args():
                         help='run on CUDA (default: False)')
     parser.add_argument('--root_size', type=int, default=11,
                         help='root dimension')
+
 
     parser.add_argument(
         "--condition_decoder_on_features",
@@ -82,9 +76,21 @@ def get_args():
     parser.add_argument(
         "--beta",
         type=float,
-        default=1e-4,
+        default=.1,
         help="beta coefficient of KL divergence",
     )
 
+    parser.add_argument(
+        "--gradient_penalty",
+        type=float,
+        default=20,
+        help="beta coefficient of KL divergence",
+    )
 
+    parser.add_argument(
+        "--discriminator_limiting_accuracy",
+        type=float,
+        default=0.7,
+        help="beta coefficient of KL divergence",
+    )
     return parser.parse_args()

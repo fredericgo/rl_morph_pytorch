@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal, Independent
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from transformer_disentangle.embedding import PositionalEncoding, StructureEncoding
+from transformer_structured.embedding import PositionalEncoding, StructureEncoding
 
 class StyleEncoder(nn.Module):
     def __init__(
@@ -58,6 +58,7 @@ class PoseEncoder(nn.Module):
         super(PoseEncoder, self).__init__()
 
         self.model_type = "PoseEncoder"
+        self.ninp = ninp
         self.root_size = root_size
         self.batch_size = batch_size
         self.max_num_limbs = max_num_limbs
@@ -68,30 +69,33 @@ class PoseEncoder(nn.Module):
         self.encoder = TransformerEncoder(
             encoder_layers,
             nlayers,
-            norm=nn.LayerNorm(ninp),
+            norm=None,
         )
-        self.pe = PositionalEncoding(ninp, self.max_num_limbs)
+        #self.pe = PositionalEncoding(ninp, self.max_num_limbs)
         self.mean_layer = nn.Linear(ninp, latent_size)
         self.logvar_layer = nn.Linear(ninp, latent_size)
 
     def forward(self, x):     
-        x0 = x[:, :self.root_size].unsqueeze(1)
-        z0 = self.root_projection(x0).permute(1, 0, 2)
-        x1 = x[:, self.root_size:]
-        self.input_state = x1.reshape(self.batch_size, self.max_num_limbs-1, -1).permute(
-            1, 0, 2
-        )
-        z1 = self.input_projection(self.input_state)
-        z = torch.cat([z0, z1])
-        z = z + self.pe(z) 
+
+        #x0 = x[:, :self.root_size].unsqueeze(1)
+        #z0 = self.root_projection(x0)
+        #x1 = x[:, self.root_size:]
+        
+        input = x.reshape(self.batch_size, self.max_num_limbs-1, -1)
+        root = torch.zeros(self.batch_size, 1, 2, device=x.device)
+        input = torch.cat([root, input], dim=1)
+
+        z = self.input_projection(input)
+        z = z.permute(1, 0, 2)
+        z = z * math.sqrt(self.ninp)
         z = self.encoder(z)
         # take root only
         mu = self.mean_layer(z)[0]
         logvar = self.logvar_layer(z)[0]
     
-        var    = torch.exp(0.5 * logvar)  # takes exponential function
-        epsilon = torch.rand_like(var)
-        z = mu + var * epsilon   
+        std = torch.exp(0.5 * logvar)  # takes exponential function
+        eps = std.new(std.size()).normal_()
+        z = mu + std * eps
         return z, mu, logvar
 
     def sample(self, x):

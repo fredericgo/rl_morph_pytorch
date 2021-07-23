@@ -24,13 +24,13 @@ class PositionalEncoding(nn.Module):
     def get_encoding(self, batch_size, length):
         return self.pe[:, :length].repeat(batch_size, 1, 1)
 
+
 class StructureEncoding(nn.Module):
-    def __init__(self, d_model, max_num_limbs, dropout=0.1, max_len=5000):
+    def __init__(self, d_model, max_num_limbs, dropout=0.1):
         super(StructureEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.max_num_limbs = max_num_limbs
         self.parent_embeddings = nn.Embedding(max_num_limbs, d_model)
-
 
     def forward(self, x):
         x = x + 1

@@ -12,7 +12,7 @@ from rl.sac import SAC
 from rl.replay_memory import ReplayMemory
 
 parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-parser.add_argument('--env-name', default="ant_b-v0",
+parser.add_argument('--env-name', default="ant8-v0",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
 parser.add_argument('--policy', default="Gaussian",
                     help='Policy Type: Gaussian | Deterministic (default: Gaussian)')
@@ -53,6 +53,10 @@ parser.add_argument('--log_interval', type=int, default=10,
                     help='checkpoint training model every # steps')
 parser.add_argument('--eval_interval', type=int, default=100, 
                     help='checkpoint training model every # steps')
+parser.add_argument('--rnd', type=bool, default=True, 
+                    help='checkpoint training model every # steps')
+parser.add_argument('--rnd_dim', type=int, default=50, 
+                    help='checkpoint training model every # steps')
 args = parser.parse_args()
 
 # Environment
@@ -70,7 +74,7 @@ agent = SAC(env.observation_space.shape[0], env.action_space, args)
 
 #Tesnorboard
 datetime_st = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-log_dir = f'runs/{datetime_st}_SAC_{args.env_name}_{args.policy}'
+log_dir = f'runs/{datetime_st}_SACrnd_{args.env_name}_{args.policy}'
 writer = SummaryWriter(log_dir)
 
 # Memory

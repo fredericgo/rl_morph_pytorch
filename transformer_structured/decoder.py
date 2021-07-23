@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformer_disentangle.embedding import PositionalEncoding, StructureEncoding
+from transformer_structured.embedding import PositionalEncoding, StructureEncoding
 from torch.nn import TransformerDecoder, TransformerDecoderLayer
 
 
@@ -32,25 +32,24 @@ class Decoder(nn.Module):
         self.transformer_decoder = TransformerDecoder(
             decoder_layers,
             nlayers,
-            norm=nn.LayerNorm(ninp),
+            norm=None,
         )
         pe = PositionalEncoding(ninp, self.max_num_limbs)
         self.add_module("pe", pe)
-        self.root_projection = nn.Linear(ninp, root_size)
+        self.structure_emb = StructureEncoding(ninp, self.max_num_limbs)
+        self.root_projection = nn.Linear( ninp, root_size)
         self.output_projection = nn.Linear(ninp, feature_size)
 
       
-    def forward(self, zs, zp):     
-        tgt = self.pe.get_encoding(self.batch_size, self.max_num_limbs)
-        tgt = tgt.permute(1, 0, 2)
-        #z = torch.cat([zs, zp], dim=1)
-        z = zp + zs
-        z = self.input_projection(z)
+    def forward(self, zp, structure):     
+        structure = structure.transpose(1, 0)
+        #tgt = self.pe(structure) 
+        tgt = self.structure_emb(structure)
+        z = self.input_projection(zp)
         x = self.transformer_decoder(tgt, z)
-        x0 = self.root_projection(x[:1]).reshape(self.batch_size, -1)
-        x1 = self.output_projection(x[1:]).reshape(self.batch_size, -1)
-        x = torch.cat([x0, x1], dim=1)
-        return x
+        x1 = self.output_projection(x[1:])
+        x1 = x1.transpose(0, 1).reshape(self.batch_size, -1)
+        return x1
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformer_disentangle.embedding import PositionalEncoding, StructureEncoding
+from transformer_split.embedding import PositionalEncoding, StructureEncoding
 from torch.nn import TransformerDecoder, TransformerDecoderLayer
 
 
@@ -19,6 +19,7 @@ class Decoder(nn.Module):
         nhid,
         nlayers,
         max_num_limbs,
+        transformer_norm=True,
         dropout=0.5,):
         super(Decoder, self).__init__()
 
@@ -27,30 +28,29 @@ class Decoder(nn.Module):
         self.batch_size = batch_size
         self.max_num_limbs = max_num_limbs
     
-        self.input_projection = nn.Linear(latent_size, ninp)
+        self.input_projection = nn.Linear(latent_size*2, ninp)
         decoder_layers = TransformerDecoderLayer(ninp, nhead, nhid, dropout)
         self.transformer_decoder = TransformerDecoder(
             decoder_layers,
             nlayers,
-            norm=nn.LayerNorm(ninp),
+            norm=nn.LayerNorm(ninp) if transformer_norm else None,
         )
         pe = PositionalEncoding(ninp, self.max_num_limbs)
         self.add_module("pe", pe)
+        self.structure_emb = StructureEncoding(ninp, self.max_num_limbs)
         self.root_projection = nn.Linear(ninp, root_size)
         self.output_projection = nn.Linear(ninp, feature_size)
 
       
-    def forward(self, zs, zp):     
-        tgt = self.pe.get_encoding(self.batch_size, self.max_num_limbs)
-        tgt = tgt.permute(1, 0, 2)
-        #z = torch.cat([zs, zp], dim=1)
-        z = zp + zs
+    def forward(self, zp, zc, structure):   
+        z = torch.cat([zp, zc], dim=-1)  
+        structure = structure.transpose(1, 0)
+        tgt = self.structure_emb(structure)
         z = self.input_projection(z)
         x = self.transformer_decoder(tgt, z)
-        x0 = self.root_projection(x[:1]).reshape(self.batch_size, -1)
-        x1 = self.output_projection(x[1:]).reshape(self.batch_size, -1)
-        x = torch.cat([x0, x1], dim=1)
-        return x
+        x1 = self.output_projection(x[1:])
+        x1 = x1.transpose(0, 1).reshape(self.batch_size, -1)
+        return x1
 
 
 if __name__ == "__main__":
