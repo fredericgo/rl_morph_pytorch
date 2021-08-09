@@ -1,5 +1,5 @@
 import numpy as np
-from env.ant_like_env import AntLikeEnv
+from envs.ant_like_env import AntLikeEnv
 
 
 class Env(AntLikeEnv):

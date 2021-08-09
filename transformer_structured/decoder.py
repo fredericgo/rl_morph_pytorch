@@ -1,6 +1,7 @@
 import math
 
 import torch
+from torch._C import ThroughputBenchmark
 import torch.nn as nn
 import torch.nn.functional as F
 from transformer_structured.embedding import PositionalEncoding, StructureEncoding
@@ -37,14 +38,15 @@ class Decoder(nn.Module):
         pe = PositionalEncoding(ninp, self.max_num_limbs)
         self.add_module("pe", pe)
         self.structure_emb = StructureEncoding(ninp, self.max_num_limbs)
-        self.root_projection = nn.Linear( ninp, root_size)
+        self.root_projection = nn.Linear(ninp, root_size)
         self.output_projection = nn.Linear(ninp, feature_size)
 
       
     def forward(self, zp, structure):     
-        structure = structure.transpose(1, 0)
         #tgt = self.pe(structure) 
         tgt = self.structure_emb(structure)
+        tgt = tgt.transpose(0, 1)
+        zp = zp.unsqueeze(0)
         z = self.input_projection(zp)
         x = self.transformer_decoder(tgt, z)
         x1 = self.output_projection(x[1:])

@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import torch.optim as optim
+import numpy as np
 
 from transformer_split.encoders import PoseEncoder
 from transformer_split.decoder import Decoder
@@ -15,6 +16,20 @@ def kl_divergence(mu, logvar):
 
 def mse_loss(input, target):
     return (input - target).pow(2).mean()
+
+def frange_cycle_linear(start, stop, n_epoch, n_cycle=4, ratio=0.5):
+    L = np.ones(n_epoch)
+    period = n_epoch/n_cycle
+    step = (stop-start)/(period*ratio) # linear schedule
+
+    for c in range(n_cycle):
+
+        v , i = start , 0
+        while v <= stop and (int(i+c*period) < n_epoch):
+            L[int(i+c*period)] = v
+            v += step
+            i += 1
+    return L    
 
 class VAE_Model(nn.Module):
     def __init__(self, args):
@@ -62,7 +77,7 @@ class VAE_Model(nn.Module):
         encoder_parameters = list(self.enc.parameters())
         self.auto_encoder_optimizer = optim.Adam(
             encoder_parameters + list(self.decoder.parameters()),
-            lr=args.lr,
+            lr=args.ae_lr,
         )
 
         self.discriminator_optimizer = optim.Adam(
@@ -80,6 +95,7 @@ class VAE_Model(nn.Module):
         self.root_size = args.root_size
         self.discriminator_limiting_accuracy = args.discriminator_limiting_accuracy
         self.gp_weight = args.gradient_penalty
+        self.beta_schedule = frange_cycle_linear(0, args.beta, args.epochs, 4, 1)
 
     def _gradient_penalty(self, D, real_data, generated_data):
         real_data = torch.cat(real_data, dim=-1)
@@ -120,12 +136,12 @@ class VAE_Model(nn.Module):
     def transfer(self, x, structure):
         x_root, x_body = self.split_root_body(x)
 
-        zp, mean, logvar = self.enc(x_body)
-        xr = self.decoder(zp, structure)
+        zp, zc, mean, logvar = self.enc(x_body)
+        xr = self.decoder(zp, zc, structure)
         xr = torch.cat([x_root, xr], dim=-1)
         return xr
 
-    def train_recon(self, x1, x2, structure):
+    def train_recon(self, x1, x2, structure, epoch):
         self.auto_encoder_optimizer.zero_grad()
         x1_root, x1_body = self.split_root_body(x1)
         x2_root, x2_body = self.split_root_body(x2)
@@ -140,15 +156,15 @@ class VAE_Model(nn.Module):
         rec_loss2 = mse_loss(x2_r_body, x2_body) 
 
         reconstruction_loss = rec_loss1 + rec_loss2
-        loss = reconstruction_loss + self.beta * kl_loss
+        loss = reconstruction_loss + self.beta_schedule[epoch] * kl_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.parameters(), 0.5)
 
         self.auto_encoder_optimizer.step()
-        return rec_loss1, rec_loss1, kl_loss
+        return rec_loss1, rec_loss1, kl_loss, self.beta_schedule[epoch], mean.mean(), logvar.mean()
 
 
-    def train_generator(self, x1, x3, structure3):
+    def train_generator(self, x1, x3, structure3, epoch):
         self.generator_optimizer.zero_grad()
 
         x1_root, x1_body = self.split_root_body(x1)
@@ -177,7 +193,7 @@ class VAE_Model(nn.Module):
         d2 = self.discriminator(x3_body, xr_r3)
         gen_loss_2 = F.cross_entropy(d2, true_labels)
 
-        generator_loss = gen_loss_1 + gen_loss_2 + self.beta * kl_loss
+        generator_loss = gen_loss_1 + gen_loss_2 + self.beta_schedule[epoch]* kl_loss
 
         generator_loss.backward()
 

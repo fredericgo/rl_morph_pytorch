@@ -30,7 +30,7 @@ parser.add_argument('--n_nodes', type=int, default=17,
                     help='max number of nodes in decoder')
 parser.add_argument('--hidden_dim', type=int, default=512, metavar='N',
                     help='hidden size (default: 256)')
-parser.add_argument('--latent_dim', type=int, default=128,
+parser.add_argument('--latent_dim', type=int, default=64,
                     help='Encoder latent dimension')
 parser.add_argument('--cuda', action="store_true",
                     help='run on CUDA (default: False)')
@@ -94,6 +94,12 @@ parser.add_argument(
         default=0.6,
         help="beta coefficient of KL divergence",
     )
+parser.add_argument(
+        "--gradient_penalty",
+        type=float,
+        default=10,
+        help="beta coefficient of KL divergence",
+    )
 args = parser.parse_args()
 
 
@@ -103,7 +109,7 @@ np.random.seed(args.seed)
 # Agent
 device = torch.device("cuda" if args.cuda else "cpu")
 
-env_names = ["ant-v0", "ant3-v0", "ant_a-v0", "ant_b-v0"]
+env_names = ["ant4-walk-v0", "ant3-walk-v0", "ant5-walk-v0", "ant6-walk-v0"]
 train_envs = [gym.make(n) for n in env_names]
 graphs = [getGraphStructure(e.xml) for e in train_envs]
 # All environments have the same dimension per limb.
@@ -119,8 +125,8 @@ root_dir = util.get_project_root()
 render_env = train_envs[0]
 render_graph = graphs[0]
 
-memory_file = root_dir / f"data/ant_s1.memory" 
-env = gym.make('ant_s1-v0')
+memory_file = root_dir / f"data/ant3-walk.memory" 
+env = gym.make('ant4-walk-v0')
 dataset = ReplayMemoryDataset(
             memory_file, 
             getGraphStructure(env.xml),

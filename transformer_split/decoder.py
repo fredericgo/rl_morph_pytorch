@@ -19,7 +19,7 @@ class Decoder(nn.Module):
         nhid,
         nlayers,
         max_num_limbs,
-        transformer_norm=True,
+        transformer_norm=False,
         dropout=0.5,):
         super(Decoder, self).__init__()
 
@@ -40,13 +40,18 @@ class Decoder(nn.Module):
         self.structure_emb = StructureEncoding(ninp, self.max_num_limbs)
         self.root_projection = nn.Linear(ninp, root_size)
         self.output_projection = nn.Linear(ninp, feature_size)
+        self.latent_size = latent_size
 
       
     def forward(self, zp, zc, structure):   
         z = torch.cat([zp, zc], dim=-1)  
         structure = structure.transpose(1, 0)
+        #tgt = torch.zeros(structure.size(0),
+        #                  structure.size(1),
+        #                  self.latent_size*2, 
+        #                  device=structure.device).transpose(1, 0)
         tgt = self.structure_emb(structure)
-        z = self.input_projection(z)
+        z = self.input_projection(z).unsqueeze(0)
         x = self.transformer_decoder(tgt, z)
         x1 = self.output_projection(x[1:])
         x1 = x1.transpose(0, 1).reshape(self.batch_size, -1)

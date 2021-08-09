@@ -8,21 +8,20 @@ def get_args():
                         help='Encoder latent dimension')
     parser.add_argument('--seed', type=int, default=123456, metavar='N',
                         help='random seed (default: 123456)')
-    parser.add_argument('--lr', type=float, default=1e-4, metavar='N',
+    parser.add_argument('--lr', type=float, default=1e-5, metavar='N',
                         help='random seed (default: 123456)')
-    parser.add_argument('--epochs', type=int, default=400, metavar='N',
+    parser.add_argument('--ae_lr', type=float, default=1e-3, metavar='N',
                         help='random seed (default: 123456)')
-    parser.add_argument('--generator_times', type=int, default=2, metavar='N',
+    parser.add_argument('--epochs', type=int, default=3000, metavar='N',
+                        help='random seed (default: 123456)')
+    parser.add_argument('--generator_times', type=int, default=1, metavar='N',
                         help='random seed (default: 123456)')
     parser.add_argument('--discriminator_times', type=int, default=1, help="number of times the discriminator is run")
-
-    parser.add_argument('--batch_size', type=int, default=128, metavar='N',
+    parser.add_argument('--batch_size', type=int, default=256, metavar='N',
                         help='random seed (default: 123456)')
     parser.add_argument('--checkpoint_interval', type=int, default=100, 
                         help='checkpoint training model every # steps')
     parser.add_argument('--cuda', action="store_true",
-                        help='run on CUDA (default: False)')
-    parser.add_argument('--msg_dim', type=int, default=32,
                         help='run on CUDA (default: False)')
     parser.add_argument('--root_size', type=int, default=11,
                         help='root dimension')
@@ -38,7 +37,7 @@ def get_args():
     )
     parser.add_argument(
         "--attention_heads",
-        default=8,
+        default=2,
         type=int,
         help="How many attention heads to stack",
     )
@@ -66,7 +65,7 @@ def get_args():
     parser.add_argument(
         "--beta",
         type=float,
-        default=.1,
+        default=1e-1,
         help="beta coefficient of KL divergence",
     )
 

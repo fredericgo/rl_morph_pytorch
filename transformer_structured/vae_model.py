@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import torch.optim as optim
+import numpy as np
 
 from transformer_structured.encoders import StyleEncoder, PoseEncoder
 from transformer_structured.decoder import Decoder
@@ -15,6 +16,21 @@ def kl_divergence(mu, logvar):
 
 def mse_loss(input, target):
     return (input - target).pow(2).mean()
+
+def frange_cycle_linear(start, stop, n_epoch, n_cycle=4, ratio=0.5):
+    L = np.ones(n_epoch)
+    period = n_epoch/n_cycle
+    step = (stop-start)/(period*ratio) # linear schedule
+
+    for c in range(n_cycle):
+
+        v , i = start , 0
+        while v <= stop and (int(i+c*period) < n_epoch):
+            L[int(i+c*period)] = v
+            v += step
+            i += 1
+    return L    
+
 
 class VAE_Model(nn.Module):
     def __init__(self, args):
@@ -62,7 +78,7 @@ class VAE_Model(nn.Module):
         encoder_parameters = list(self.pose_enc.parameters())
         self.auto_encoder_optimizer = optim.Adam(
             encoder_parameters + list(self.decoder.parameters()),
-            lr=args.lr,
+            lr=args.ae_lr,
         )
 
         self.discriminator_optimizer = optim.Adam(
@@ -79,7 +95,42 @@ class VAE_Model(nn.Module):
         self.device = torch.device("cuda" if args.cuda else "cpu")
         self.root_size = args.root_size
         self.discriminator_limiting_accuracy = args.discriminator_limiting_accuracy
+        self.gp_weight = args.gradient_penalty
 
+        self.beta_schedule = frange_cycle_linear(0, args.beta, args.epochs, 3, 1)
+
+
+    def _gradient_penalty(self, D, real_data, generated_data):
+        real_data = torch.cat(real_data, dim=-1)
+        generated_data = torch.cat(generated_data, dim=-1)
+        batch_size = real_data.size(0)
+        d = int(real_data.size(1) / 2)
+        # Calculate interpolation
+        alpha = torch.rand(batch_size, 1, device=real_data.device, requires_grad=True)
+        alpha = alpha.expand_as(real_data)
+        alpha = alpha.to(generated_data.device)
+
+        interpolated = alpha * real_data.data + (1 - alpha) * generated_data.data
+        interpolated = torch.split(interpolated, [d, d], dim=-1)
+    
+        # Calculate probability of interpolated examples
+        prob_interpolated = D(*interpolated)
+        # Calculate gradients of probabilities with respect to examples
+        gradients = torch.autograd.grad(outputs=prob_interpolated, inputs=interpolated,
+                               grad_outputs=torch.ones(prob_interpolated.size(), 
+                                                       device=real_data.device),
+                               create_graph=True, retain_graph=True)[0]
+
+        # Gradients have shape (batch_size, num_channels, img_width, img_height),
+        # so flatten to easily take norm per example in batch
+        gradients = gradients.view(batch_size, -1)
+
+        # Derivatives of the gradient close to 0 can cause problems because of
+        # the square root, so manually calculate norm and add epsilon
+        gradients_norm = torch.sqrt(torch.sum(gradients ** 2, dim=1) + 1e-12)
+
+        # Return gradient penalty
+        return ((gradients_norm - 1) ** 2).mean()
     def split_root_body(self, x):
         x_root = x[:, :self.root_size]
         x_body = x[:, self.root_size:]
@@ -93,13 +144,13 @@ class VAE_Model(nn.Module):
         xr = torch.cat([x_root, xr], dim=-1)
         return xr
 
-    def train_recon(self, x1, x2, structure):
+    def train_recon(self, x1, x2, structure, epoch):
         self.auto_encoder_optimizer.zero_grad()
         x1_root, x1_body = self.split_root_body(x1)
         x2_root, x2_body = self.split_root_body(x2)
 
         zp_1, mean, logvar = self.pose_enc(x1_body)
-        zp_2, mean, logvar = self.pose_enc(x2_body)
+        zp_2, _, _ = self.pose_enc(x2_body)
         x1_r_body = self.decoder(zp_1, structure)
         x2_r_body = self.decoder(zp_2, structure)
         kl_loss = kl_divergence(mean, logvar).mean()
@@ -108,15 +159,15 @@ class VAE_Model(nn.Module):
         rec_loss2 = mse_loss(x2_r_body, x2_body) 
 
         reconstruction_loss = rec_loss1 + rec_loss2
-        loss = reconstruction_loss + self.beta * kl_loss
+        loss = reconstruction_loss + self.beta_schedule[epoch] * kl_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.parameters(), 0.5)
 
         self.auto_encoder_optimizer.step()
-        return rec_loss1, rec_loss1, kl_loss
+        return rec_loss1, rec_loss1, kl_loss, self.beta_schedule[epoch]
 
 
-    def train_generator(self, x1, x3, structure3):
+    def train_generator(self, x1, x3, structure3, epoch):
         self.generator_optimizer.zero_grad()
 
         x1_root, x1_body = self.split_root_body(x1)
@@ -144,14 +195,14 @@ class VAE_Model(nn.Module):
         d2 = self.discriminator(x3_body, xr_r3)
         gen_loss_2 = F.cross_entropy(d2, true_labels)
 
-        generator_loss = gen_loss_1 + gen_loss_2 + self.beta * kl_loss
+        generator_loss = gen_loss_1 + gen_loss_2 + self.beta_schedule[epoch] * kl_loss
 
         generator_loss.backward()
 
         self.generator_optimizer.step()
         return gen_loss_1, gen_loss_2, kl_loss
 
-    def train_discriminator(self, x1, x2, x3, structure3):
+    def train_discriminator(self, x1, x2, x3, structure3, epoch):
         self.discriminator_optimizer.zero_grad()
         x1_root, x1_body = self.split_root_body(x1)
         x2_root, x2_body = self.split_root_body(x2)
@@ -173,7 +224,12 @@ class VAE_Model(nn.Module):
 
         disc_loss_fake = F.cross_entropy(d_fake, fake_labels)
 
-        discriminator_loss = disc_loss_real + disc_loss_fake
+
+        #gp = self.gp_weight * self._gradient_penalty(self.discriminator,
+        #                                             (x2_body, x3_body),
+        #                                             (x2_body, xr_13))
+
+        discriminator_loss = disc_loss_real + disc_loss_fake 
         discriminator_loss.backward()
        
         # calculate discriminator accuracy for this step

@@ -8,8 +8,6 @@ import sys
 sys.path.insert(0, '..')
 
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
 import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
 from torch.utils.tensorboard import SummaryWriter
@@ -30,7 +28,7 @@ device = torch.device("cuda" if args.cuda else "cpu")
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 
-env_names = ["ant-v0", "ant3-v0", "ant_jump-v0", "ant3_jump-v0", "ant_a-v0", "ant_b-v0"]
+env_names = ["ant4-rnd-v0", "ant3-rnd-v0"]
 train_envs = [gym.make(n) for n in env_names]
 graphs = [getGraphStructure(e.xml) for e in train_envs]
 # All environments have the same dimension per limb.
@@ -83,7 +81,7 @@ for epoch in range(args.epochs):
         x1, x2, structure = next(loader)
 
         x1, x2, structure = x1.to(device), x2.to(device), structure.to(device)
-        rec_loss1, rec_loss2, kl_loss = vae_model.train_recon(x1, x2, structure)    
+        rec_loss1, rec_loss2, kl_loss, beta = vae_model.train_recon(x1, x2, structure, epoch)    
         rec_tot += rec_loss1
         kl_tot += kl_loss
         overall_loss += rec_loss1 + kl_loss
@@ -92,6 +90,8 @@ for epoch in range(args.epochs):
     print(f"\tEpoch {epoch + 1} completed!\t Average Loss: {avg_loss}")
     writer.add_scalar('rec_loss', rec_tot / iteration, epoch)
     writer.add_scalar('kl_loss', kl_tot / iteration, epoch)
+    writer.add_scalar('beta', beta, epoch)
+
 
   
     if epoch % args.checkpoint_interval == 0 and epoch > 0:

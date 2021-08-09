@@ -16,7 +16,7 @@ parser.add_argument('--env-name', default="ant_s1-v0",
                     help='Mujoco Gym environment (default: HalfCheetah-v2)')
 parser.add_argument('--policy', default="Gaussian",
                     help='Policy Type: Gaussian | Deterministic (default: Gaussian)')
-parser.add_argument('--num_steps', type=int, default=10000, metavar='N',
+parser.add_argument('--num_steps', type=int, default=5000, metavar='N',
                     help='size of replay buffer (default: 10000000)')
 parser.add_argument('--seed', type=int, default=123456, metavar='N',
                     help='random seed (default: 123456)')

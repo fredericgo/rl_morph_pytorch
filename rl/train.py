@@ -53,6 +53,8 @@ parser.add_argument('--log_interval', type=int, default=10,
                     help='checkpoint training model every # steps')
 parser.add_argument('--eval_interval', type=int, default=100, 
                     help='checkpoint training model every # steps')
+parser.add_argument('--rnd', type=bool, default=False, 
+                    help='checkpoint training model every # steps')
 args = parser.parse_args()
 
 # Environment

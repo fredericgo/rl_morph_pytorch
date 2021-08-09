@@ -3,30 +3,21 @@ import math
 
 import gym
 import numpy as np
-import itertools
 from itertools import cycle
 
 import sys
 sys.path.insert(0, '..')
 from torch.utils.tensorboard import SummaryWriter
-from collections import namedtuple
 
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
 import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-from torch.optim import Adam
-
-from torch.utils.data import ConcatDataset
 from torch.utils.data import DataLoader
 
 from transformer_split.util import getGraphStructure
 from transformer_split.data_loader import PairedDataset
 from transformer_split import util
-from transformer_split.encoders import PoseEncoder
-from transformer_split.decoder import Decoder
 from transformer_split.arguments import get_args
 from transformer_split.vae_model import VAE_Model
 
@@ -39,8 +30,11 @@ device = torch.device("cuda" if args.cuda else "cpu")
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 
-env_names = ["ant-v0", "ant3-v0", "ant_jump-v0", "ant3_jump-v0", 
-             "ant_a-v0", "ant_b-v0", "ant5-v0", "ant6-v0"]
+#env_names = ["ant4-walk-v0", "ant3-walk-v0", "ant4-jump-v0", "ant3-jump-v0",]
+env_names = ["ant4-rnd-v0", "ant4-jump-v0", "ant3-rnd-v0", "ant3-walk-v0", "ant3-jump-v0", 
+             "ant4-walk-v0", "ant5-walk-v0", "ant5-rnd-v0",
+              "ant6-walk-v0", "ant6-rnd-v0"]
+
 train_envs = [gym.make(n) for n in env_names]
 graphs = [getGraphStructure(e.xml) for e in train_envs]
 # All environments have the same dimension per limb.
@@ -98,7 +92,7 @@ for epoch in range(args.epochs):
         x1, x2, structure = next(loader)
 
         x1, x2, structure = x1.to(device), x2.to(device), structure.to(device)
-        rec_loss1, rec_loss2, kl_loss = vae_model.train_recon(x1, x2, structure)    
+        rec_loss1, rec_loss2, kl_loss, mu, logvar, beta = vae_model.train_recon(x1, x2, structure, epoch)    
         
         # B. run the generator
         for _ in range(args.generator_times):
@@ -106,7 +100,7 @@ for epoch in range(args.epochs):
             x3, _, structure_3 = next(loader)
             x1, x3, structure_3 = x1.to(device), x3.to(device), structure_3.to(device)
 
-            gen_loss_1, gen_loss_2, kl_loss = vae_model.train_generator(x1, x3, structure_3)
+            gen_loss_1, gen_loss_2, kl_loss = vae_model.train_generator(x1, x3, structure_3, epoch)
         
         # C. run the discriminator
         for _ in range(args.discriminator_times):
@@ -127,7 +121,12 @@ for epoch in range(args.epochs):
     
     avg_loss = overall_loss / n_batches
     print(f"\tEpoch {epoch + 1} completed!\t Average Loss: {avg_loss}")
-    writer.add_scalar('rec_loss', rec_tot / n_batches, epoch)
+
+    writer.add_scalar('Rec/rec_loss', rec_tot / n_batches, epoch)
+    writer.add_scalar('Rec/beta', beta, epoch)
+    writer.add_scalar('Rec/mu', mu, epoch)
+    writer.add_scalar('Rec/logvar', logvar, epoch)
+
     writer.add_scalar('kl_loss', kl_tot / iteration, epoch)
     writer.add_scalar('Generator/generator_loss', 
                       (gen1_tot + gen2_tot + args.beta * kl_tot) / n_batches, epoch)

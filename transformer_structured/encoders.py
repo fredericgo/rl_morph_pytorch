@@ -71,22 +71,18 @@ class PoseEncoder(nn.Module):
             nlayers,
             norm=None,
         )
-        #self.pe = PositionalEncoding(ninp, self.max_num_limbs)
+        self.pe = PositionalEncoding(ninp, self.max_num_limbs)
         self.mean_layer = nn.Linear(ninp, latent_size)
         self.logvar_layer = nn.Linear(ninp, latent_size)
 
     def forward(self, x):     
-
-        #x0 = x[:, :self.root_size].unsqueeze(1)
-        #z0 = self.root_projection(x0)
-        #x1 = x[:, self.root_size:]
-        
         input = x.reshape(self.batch_size, self.max_num_limbs-1, -1)
         root = torch.zeros(self.batch_size, 1, 2, device=x.device)
         input = torch.cat([root, input], dim=1)
-
+        
         z = self.input_projection(input)
-        z = z.permute(1, 0, 2)
+
+        z = z.transpose(1, 0)
         z = z * math.sqrt(self.ninp)
         z = self.encoder(z)
         # take root only

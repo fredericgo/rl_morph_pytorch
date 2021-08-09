@@ -19,7 +19,7 @@ class PoseEncoder(nn.Module):
         nhid,
         nlayers,
         max_num_limbs,
-        transformer_norm=True,
+        transformer_norm=False,
         dropout=0.5,):
         super(PoseEncoder, self).__init__()
 
